@@ -1,0 +1,145 @@
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include "../cglm/include/cglm/cglm.h"
+#include "../cglm/include/cglm/mat4.h"
+#include "../cglm/include/cglm/vec3.h"
+#include <assert.h>
+#include <math.h>
+
+void window_resize(GLFWwindow * window, int idth, int height);
+GLFWwindow * create_window();
+void render_loop_start(GLFWwindow * window);
+void render_loop_end(GLFWwindow * window);
+void mouse_callback(GLFWwindow * window, double xpos, double ypos);
+
+int main() {
+	GLFWwindow * window = create_window();
+
+	//for now just render something. That way you can start worrying about the blocks, textures, cameras etc. one at at a time.
+	unsigned int VAO;
+	glGenVertexArrays(1,&VAO);
+	glBindVertexArray(VAO);
+
+	float vertices [] = {
+		0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f,
+		0.5f, 0.0f, 0.0f,
+		//0.0f, 0.5f, 0.0f,
+		//-0.5f, 0.0f, 0.0f,
+		//0.0f, -0.5f, 0.0f,
+	};
+
+	unsigned int VBO;
+	glGenBuffers(1,&VBO);	
+	glBindBuffer(GL_ARRAY_BUFFER,VBO);
+	glBufferData(GL_ARRAY_BUFFER,sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void *)0);
+	glEnableVertexAttribArray(0);
+
+	int success;
+
+	const char * vertex_shader_source= "#version 330 core\n"
+	"layout (location = 0) in vec3 aPos;\n"
+	"void main() {\n"
+	"gl_Position = vec4(aPos, 1.0);}\0";
+	
+	//"uniform mat4 transform;\n"
+	//"gl_Position = transform*vec4(aPos, 1.0);}\0";
+
+	const char * fragment_shader_source = "#version 330 core\n"
+	"out vec4 FragColor;\n"
+	"void main() {\n"
+	"FragColor = vec4(0.9f,1.0f,0.8f,0.9f);}\0";
+
+	unsigned int vertex_shader  = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vertex_shader  , 1, &vertex_shader_source, NULL);
+	glCompileShader(vertex_shader);
+	glGetShaderiv(vertex_shader,GL_COMPILE_STATUS,&success);
+	assert(success);
+	
+	unsigned int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
+	glCompileShader(fragment_shader);
+	glGetShaderiv(fragment_shader,GL_COMPILE_STATUS,&success);
+	assert(success);
+
+	unsigned int shader_program = glCreateProgram();
+	glAttachShader(shader_program, fragment_shader);
+	glAttachShader(shader_program, vertex_shader);
+	glLinkProgram(shader_program);
+	glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
+	assert(success);
+
+	glDeleteShader(vertex_shader);	
+	glDeleteShader(fragment_shader);	
+	
+	glUseProgram(shader_program);
+	//int transform_loc = glGetUniformLocation(shader_program,"transform");
+
+	
+	glEnable(GL_DEPTH_TEST);
+
+	while (!glfwWindowShouldClose(window)) {
+		render_loop_start(window);
+		
+		glBindVertexArray(VAO);
+		glUseProgram(shader_program);
+		//glUniformMatrix4fv(transform_loc,1,GL_FALSE, (float *)look_at);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		render_loop_end(window);
+	}
+}
+
+void mouse_callback(GLFWwindow * window, double xpos, double ypos) {
+	static int first_mouse = true;
+
+	static float lastX = 400;
+	static float lastY = 400;
+	static float pitch = 0;
+	static float yaw = 0;
+	float xoffset = (xpos - lastX) * 0.01;
+	float yoffset = (ypos - lastY) * 0.01;
+
+	if (first_mouse) {
+		lastX = xpos;
+		lastY = ypos;
+		first_mouse = false;
+	}
+}
+
+void render_loop_end(GLFWwindow * window) {	
+	glfwSwapBuffers(window);
+}
+
+void render_loop_start(GLFWwindow * window) {
+	glClearColor(0.6, 0.0, 0.1, 0.5);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void window_resize(GLFWwindow * window, int width, int height) {
+	glViewport(0, 0, width, height);	
+}
+
+GLFWwindow * create_window() {
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); 
+	
+	GLFWwindow* window = glfwCreateWindow(1920,1080,"Main", NULL, NULL);
+	glfwMakeContextCurrent(window);
+	glfwSetWindowSizeCallback(window, window_resize);
+
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetCursorPosCallback(window, mouse_callback);
+
+	glfwPollEvents();
+	glViewport(0, 0, 1920, 1080);	
+
+	glewExperimental = GL_TRUE;
+	glewInit();
+
+	return window;
+}
