@@ -13,10 +13,11 @@
 
 const char * vertexShaderSource = "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
-    "uniform vec2 transform;\n" 
+    //"uniform vec2 transform;\n" 
     "void main()\n"
     "{\n"
-    "gl_Position = -vec4(transform, 0.0, 0.0) + vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+    "gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+    //"gl_Position = -vec4(transform, 0.0, 0.0) + vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
     "}\0";
 
 const char * fragmentShaderSource = "#version 330 core\n"
@@ -33,50 +34,6 @@ void processInput(GLFWwindow * window);
 
 float random_float () {
     return (float) rand() / (float)(RAND_MAX/0.5);
-}
-
-typedef struct ball {
-	float x;
-	float y; 
-	float v_x;
-	float v_y; 
-	float a_x;
-	float a_y; 
-	float m;
-} ball;
-
-void tension(ball * b) {
-    float k = 0.01;
-    int x_coords[2] = {-1.0, 1.0};
-    int y_coords[2] = {-1.0, 1.0};
-
-    for (int i =0; i<2; i++) {
-	for (int j =0; j<2; j++) {
-	    
-	    float x_pos = x_coords[i];
-	    float y_pos = y_coords[j];
-
-	    float x_dist = fabs(x_pos - b->x);
-	    float y_dist = fabs(y_pos - b->y);
-	    float absolute_force = k*(x_dist*x_dist + y_dist*y_dist);
-
-	    float x_strenght = x_dist/(x_dist+y_dist);
-	    float y_strenght = y_dist/(x_dist+y_dist);
-
-	    float x_force = x_strenght* absolute_force;
-	    float y_force = y_strenght* absolute_force;
-
-	    int mod1 = rand()%10; 
-	    int mod2 = rand()%10;
-    
-	    int delta1 = mod1 < 5 ? -1 : 1;
-	    int delta2 = mod2 < 5 ? -1 : 1;
-
-	    b->x += x_force*x_pos + ((float) delta1* ((float) (rand() % 100)))/10000;
-	    b -> y +=  y_force*y_pos  + ((float ) delta2* ((float) (rand() % 100)))/10000;
-	}
-    }
-
 }
 
 int main()
@@ -107,17 +64,44 @@ int main()
     //YEAH TURNS OUT THE POSITION OF THIS MATTERS A LOT. HAS TO BE AFTER THE WINDOW HAS BEEN CREATED!
     glewExperimental = GL_TRUE; 
     glewInit();
+    
+    int verts_per_level = 102;
+    int attribs_per_vert = 3;
+    int number_of_levels = 100;
+    float delta_h = (float)2.0/number_of_levels;
+    float vertices[verts_per_level*attribs_per_vert*number_of_levels];
+    float max_radious = 1;
 
-    #define number_of_vertices 36 
+    for (int j = 0; j < number_of_levels; j++) {
+	//note, first and last must repeat
+	float height1 = 1-j*delta_h;
+	float height2 = height1-delta_h;
+	
+	printf("P: %f\n", height2);
 
-    float vertices[3*(number_of_vertices+2)] = {
-	0.0, 0.0, 0.0,
-    };
+	float r1 = sqrt(1-height1*height1);
+	float r2;
 
-    for (int i = 1; i < number_of_vertices + 2; i++) {
-	vertices[3*i] = ball_radious*cos(2*M_PI* ((float)(i-1)/(float)(number_of_vertices)));
-	vertices[3*i + 1] = ball_radious*sin(2*M_PI* ((float)(i-1)/(float)(number_of_vertices)));
-	vertices[3*i + 2] = 0.0;
+	if (height2 < -0.99) {
+	    r2 = 0;
+	} else {
+	    r2 = sqrt(1-height2*height2);
+	}
+
+	for (int i = 0; i <= verts_per_level; i+= 2){		
+	    float angle = 2*M_PI*((float)(i/100.0));
+
+	    //upper
+	    int offset = j*verts_per_level*attribs_per_vert;
+	    vertices[offset + 3*i + 0] = r1*cos(angle);
+	    vertices[offset +3*i + 1] = height1;
+	    vertices[offset +3*i + 2] = r1*sin(angle);
+
+	    //lower
+	    vertices[offset +3*i + 3] = r2*cos(angle);
+	    vertices[offset +3*i + 4] = height2;
+	    vertices[offset +3*i + 5] = r2*sin(angle);
+	}
     }
 
     //tell gl to generate vertex arrays and bind them
@@ -155,15 +139,8 @@ int main()
     glEnableVertexAttribArray(0);
     glEnable(GL_MULTISAMPLE);
     
-    int transform_loc = glGetUniformLocation(shaderProgram,"transform");
+    //int transform_loc = glGetUniformLocation(shaderProgram,"transform");
     
-    ball balls[100];
-
-    for (int i = 0; i < 100; i++) {
-	ball b = {5*random_float(),5*random_float(),random_float(),random_float(),0.0,-0.05,random_float()};
-	balls[i] = b;	
-    }
-
     while(!glfwWindowShouldClose(window)) {
 	processInput(window);
 	
@@ -173,11 +150,8 @@ int main()
 	glUseProgram(shaderProgram);
 	glBindVertexArray(VAO);
 	
-	for (int i = 0; i < 100; i++) {
-	    glUniform2f(transform_loc,balls[i].x, balls[i].y);
-	    glDrawArrays(GL_TRIANGLE_FAN, 0, number_of_vertices + 2);
-	    tension(&balls[i]);
-	}
+	//glUniform2f(transform_loc,balls[i].x, balls[i].y);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, verts_per_level*number_of_levels);
 	
 	glfwSwapBuffers(window);
 	glfwPollEvents(); //this seems to be an issue with wayland 
