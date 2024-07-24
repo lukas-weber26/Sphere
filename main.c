@@ -16,7 +16,7 @@ const char * vertexShaderSource = "#version 330 core\n"
     "uniform vec2 transform;\n" 
     "void main()\n"
     "{\n"
-    "gl_Position = vec4(transform, 0.0, 0.0) + vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+    "gl_Position = -vec4(transform, 0.0, 0.0) + vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
     "}\0";
 
 const char * fragmentShaderSource = "#version 330 core\n"
@@ -35,7 +35,7 @@ float random_float () {
     return (float) rand() / (float)(RAND_MAX/0.5);
 }
 
-    typedef struct ball {
+typedef struct ball {
 	float x;
 	float y; 
 	float v_x;
@@ -43,64 +43,40 @@ float random_float () {
 	float a_x;
 	float a_y; 
 	float m;
-    } ball;
+} ball;
 
-    void update_ball_position(ball * b) {
-	b->v_x += b->a_x*0.1;
-	b->x += b->v_x*0.1;
-	b->v_y += b->a_y*0.1;
-	b->y += b->v_y*0.1;
-    }
+void tension(ball * b) {
+    float k = 0.01;
+    int x_coords[2] = {-1.0, 1.0};
+    int y_coords[2] = {-1.0, 1.0};
 
-    void check_ball_bounce(ball * b) {
-	if (b->x <= -(1-ball_radious)) {
-	    b ->v_x = - b-> v_x;
-	    b -> x = -(1-ball_radious);
-	}
-	if (b->x >=(1-ball_radious)) {
-	    b ->v_x = - b-> v_x;
-	    b -> x = (1-ball_radious);
-	}
-	if (b->y <= -(1-ball_radious)) {
-	    b ->v_y = - b-> v_y;
-	    b ->y = -(1-ball_radious);
-	}
-	if (b->y >= (1-ball_radious)) {
-	    b ->v_y = - b-> v_y;
-	    b ->y = (1-ball_radious);
-	}
+    for (int i =0; i<2; i++) {
+	for (int j =0; j<2; j++) {
+	    
+	    float x_pos = x_coords[i];
+	    float y_pos = y_coords[j];
 
-    }
+	    float x_dist = fabs(x_pos - b->x);
+	    float y_dist = fabs(y_pos - b->y);
+	    float absolute_force = k*(x_dist*x_dist + y_dist*y_dist);
 
-void check_ball_collisions(ball balls [], int num_balls) {
-    for (int main_ball = 0; main_ball < num_balls; main_ball++) {
-	for (int secondary_ball= main_ball+1; secondary_ball< num_balls; secondary_ball++) {
+	    float x_strenght = x_dist/(x_dist+y_dist);
+	    float y_strenght = y_dist/(x_dist+y_dist);
 
-	    double x_distance = balls[main_ball].x - balls[secondary_ball].x;  
-	    double y_distance = balls[main_ball].y - balls[secondary_ball].y;  
-	    double dist = sqrt(x_distance * x_distance + y_distance * y_distance);
-	    if (dist <= 2*ball_radious) {
+	    float x_force = x_strenght* absolute_force;
+	    float y_force = y_strenght* absolute_force;
+
+	    int mod1 = rand()%10; 
+	    int mod2 = rand()%10;
     
+	    int delta1 = mod1 < 5 ? -1 : 1;
+	    int delta2 = mod2 < 5 ? -1 : 1;
 
-		ball first = balls[main_ball];
-		ball second = balls[secondary_ball];
-
-		float v_first_final_x = (first.m - second.m)/(first.m + second.m)*first.v_x + 2* (second.m/(first.m+second.m))*second.v_x;
-		float v_second_final_x = 2*(first.m/(first.m+second.m))*first.v_x - ((first.m-second.m)/(first.m + second.m))*second.v_x;
-		
-		float v_first_final_y = (first.m - second.m)/(first.m + second.m)*first.v_y + 2* (second.m/(first.m+second.m))*second.v_y;
-		float v_second_final_y = 2*(first.m/(first.m+second.m))*first.v_y - ((first.m-second.m)/(first.m + second.m))*second.v_y;
-    
-		balls[main_ball].v_x = v_first_final_x;
-		balls[secondary_ball].v_x = v_second_final_x;
-		
-		balls[main_ball].v_y = v_first_final_y;
-		balls[secondary_ball].v_y = v_second_final_y;
-
-
-	    } 
+	    b->x += x_force*x_pos + ((float) delta1* ((float) (rand() % 100)))/10000;
+	    b -> y +=  y_force*y_pos  + ((float ) delta2* ((float) (rand() % 100)))/10000;
 	}
     }
+
 }
 
 int main()
@@ -179,13 +155,13 @@ int main()
     glEnableVertexAttribArray(0);
     glEnable(GL_MULTISAMPLE);
     
-    int number_balls = 30;
     int transform_loc = glGetUniformLocation(shaderProgram,"transform");
-    ball balls[number_balls];
     
-    for (int i = 0; i < number_balls; i++) {
-	ball b = {random_float(),random_float(),random_float(),random_float(),0.0,-0.05,random_float()};
-	balls[i] = b;
+    ball balls[100];
+
+    for (int i = 0; i < 100; i++) {
+	ball b = {5*random_float(),5*random_float(),random_float(),random_float(),0.0,-0.05,random_float()};
+	balls[i] = b;	
     }
 
     while(!glfwWindowShouldClose(window)) {
@@ -197,14 +173,11 @@ int main()
 	glUseProgram(shaderProgram);
 	glBindVertexArray(VAO);
 	
-	for (int i = 0; i < number_balls; i++) {
+	for (int i = 0; i < 100; i++) {
 	    glUniform2f(transform_loc,balls[i].x, balls[i].y);
 	    glDrawArrays(GL_TRIANGLE_FAN, 0, number_of_vertices + 2);
-	    update_ball_position(&balls[i]);
-	    check_ball_bounce(&balls[i]);
+	    tension(&balls[i]);
 	}
-	
-	check_ball_collisions(balls, number_balls);
 	
 	glfwSwapBuffers(window);
 	glfwPollEvents(); //this seems to be an issue with wayland 
